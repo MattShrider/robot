@@ -4,3 +4,7 @@
 *.jar
 *.war
 *.ear
+.project
+.DS_STORE
+.settings
+.classpath
