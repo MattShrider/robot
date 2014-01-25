@@ -1,18 +1,70 @@
+import robocode.AdvancedRobot;
 import robocode.HitByBulletEvent;
 import robocode.RateControlRobot;
 import robocode.RobocodeFileWriter;
+import robocode.RobotDeathEvent;
+import robocode.Rules;
 import robocode.ScannedRobotEvent;
+import robocode.util.Utils;
 
 import java.awt.*;
+import java.awt.geom.Point2D;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 
-public class BelugaBot extends RateControlRobot {
+
+public class BelugaBot extends AdvancedRobot {
+	
+	String name;
+	double energy;
+	double bearing;
+	double distance;
+	double heading;
+	double velocity;
+	
+	Enemy chargingAt = null;
+	Enemy shootingAt = null;
+	
+	/** 
+	 * Private class for representing enemies on the field.  Construction based on the onScannedRobot event.
+	 */
+	private class Enemy {
+		String name;
+		double energy;
+		double bearing;
+		double distance;
+		double heading;
+		double velocity;
+		Point location;
+		
+		public Enemy(String name, double energy, double bearing, double distance, double heading, double velocity, Point location ) {
+			this.name = name;
+			this.energy = energy;
+			this.bearing = bearing;
+			this.distance = distance;
+			this.heading = heading;
+			this.velocity = velocity;
+			this.location = location;
+		}
+		
+		public void update(double en, double be, double dis, double he, double vel, Point loc) {
+			this.energy = en;
+			this.bearing = be;
+			this.distance = dis;
+			this.heading = he;
+			this.velocity = vel;
+			this.location = loc;
+		}
+		
+	}
 	
 	double arenaRadius;
 	double maxMoveAmount;
 	ArrayList<Point> targetPositions;
 	boolean clockwise;
+	int turncounter = 0;
+	HashMap<String, Enemy> enemies = new HashMap<String, Enemy>();
 	
 	public void run() {
 		setBodyColor(Color.blue);
@@ -20,6 +72,10 @@ public class BelugaBot extends RateControlRobot {
 		setRadarColor(Color.white);
 		setBulletColor(Color.red);
 		setScanColor(Color.white);
+		
+		
+		setAdjustGunForRobotTurn(true);
+		//setAdjustRadarForRobotTurn(true);
 		
 		//gather some data for future use
 		double fieldWidth = getBattleFieldWidth();
@@ -62,17 +118,27 @@ public class BelugaBot extends RateControlRobot {
 			}
 		}
 		
-		moveTo(selectedTarget);
 		
 		int targetPositionsSize = targetPositions.size();
 		clockwise = true;
 		
 		while(true) {
-			if(clockwise)
-				currentTargetIndex++;
-			else
-				currentTargetIndex--;
-			moveTo(targetPositions.get(Math.abs(currentTargetIndex) % 4));
+			if (chargingAt == null){
+				if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){
+					if (clockwise)
+						currentTargetIndex++;
+					else
+						currentTargetIndex--;
+				}
+				Point nextGoto = targetPositions.get(Math.abs(currentTargetIndex) % 4);
+				gogo( (int) nextGoto.getX(), (int) nextGoto.getY());
+				setTurnGunRight(20);
+				execute();
+			} else {
+				gogo( chargingAt.location.x, chargingAt.location.y);
+				setTurnGunLeft(20);
+				execute();
+			}
 		}
 	}
 	
@@ -80,57 +146,93 @@ public class BelugaBot extends RateControlRobot {
 	/*** EVENTS ***/
 	/**************/
 	public void onScannedRobot(ScannedRobotEvent e) {
-		if(e.getDistance() < 600) {
-			fire(20);
-		}
 		
-		if(this.getOthers() <= 3) {
+		Point location = new Point();
+		//location of enemy is our location plus enemy bearing vector
+		location.x = (int) (e.getDistance() * Math.sin(e.getBearingRadians() + getHeadingRadians()) + getX());
+		location.y = (int) (e.getDistance() * Math.cos(e.getBearingRadians() + getHeadingRadians()) + getY());
+		
+		if (enemies.containsKey(e.getName()))
+			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
+		else
+			enemies.put(e.getName(),new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location));
+		
+		if (e.getDistance() <= 100)
+			if (chargingAt == null || chargingAt.distance < e.getDistance())
+				chargingAt = enemies.get(e.getName());
+		if(e.getDistance() < 500 || e.getVelocity() <= 1) {
+			//TODO - change the fire() method to firingAt and handle it in the main while loop.
+			fire(20);
+		} else if (getOthers() >= 10) {
 			fire(5);
 		}
+
 	}
 	
 	public void onHitByBullet(HitByBulletEvent event) {
 		clockwise = !clockwise;
 	}
 	
+	public void onRobotDeath(RobotDeathEvent e){
+		if (chargingAt == enemies.get(e.getName()))
+			chargingAt = null;
+		
+		enemies.remove(e.getName());
+	}
+	
 	/*****************/
 	/*** OUR STUFF ***/
 	/*****************/
 	
-	/* FROM WIKI */
-	private void moveTo(Point target) {
-		Point currentPosition = new Point();
-		currentPosition.setLocation(getX(), getY());
-		
-		double distanceToTarget = currentPosition.distance(target);
-		double angleToTarget = normalRelativeAngle(getAngleToTarget(currentPosition, target));
-		
-		if (Math.abs(angleToTarget) > 90.0) {
-            distanceToTarget *= -1.0;
-            if (angleToTarget > 0.0) {
-                angleToTarget -= 180.0;
-            }
-            else {
-                angleToTarget += 180.0;
-            }
-        }
-		
-		turnRight(angleToTarget - getHeading());
-		ahead(distanceToTarget);
-	}
 	
-	private double getAngleToTarget(Point source, Point target) {	
-        return Math.toDegrees(Math.atan2(target.getX() - source.getX(), target.getY() - source.getY()));
-	}
+
 	
 	/* FROM ROBO WIKI */
-	private double normalRelativeAngle(double angle) {
-        double relativeAngle = angle % 360;
-        if (relativeAngle <= -180)
-            return 180 + (relativeAngle % 180);
-        else if (relativeAngle > 180)
-            return -180 + (relativeAngle % 180);
-        else
-            return relativeAngle;
-    }
+	
+	//NOTE - These methods do NOT work for rate control robots.
+	
+	/**
+	 * This method is very verbose to explain how things work.
+	 * Do not obfuscate/optimize this sample.
+	 */
+	private void goTo(double x, double y) {
+		/* Transform our coordinates into a vector */
+		x -= getX();
+		y -= getY();
+	 
+		/* Calculate the angle to the target position */
+		double angleToTarget = Math.atan2(x, y);
+	 
+		/* Calculate the turn required get there */
+		double targetAngle = Utils.normalRelativeAngle(angleToTarget - getHeadingRadians());
+	 
+		/* 
+		 * The Java Hypot method is a quick way of getting the length
+		 * of a vector. Which in this case is also the distance between
+		 * our robot and the target location.
+		 */
+		double distance = Math.hypot(x, y);
+	 
+		/* This is a simple method of performing set front as back */
+		double turnAngle = Math.atan(Math.tan(targetAngle));
+		setTurnRightRadians(turnAngle);
+		if(targetAngle == turnAngle) {
+			setAhead(distance);
+		} else {
+			setBack(distance);
+		}
+	}
+	
+	private void gogo(int x, int y) {
+	    double a;
+	    setTurnRightRadians(Math.tan(
+	        a = Math.atan2(x -= (int) getX(), y -= (int) getY()) 
+	              - getHeadingRadians()));
+	    setAhead(Math.hypot(x, y) * Math.cos(a));
+	}
+	
+	/** Gets the time it will take in game ticks for the bullet to reach the enemy **/
+	public static long getBulletTravelTime(double distanceToEnemy, double bulletPower) {
+	     return (long) Math.ceil(distanceToEnemy / (20 - (3 * bulletPower)));
+	}
 }
