@@ -138,11 +138,11 @@ public class BelugaBot extends AdvancedRobot {
 				double gunBearing = getGunHeading() - chargingAt.heading;
 				
 				setTurnGunRight(20);
-				if(gunBearing > -10 && gunBearing < 10) {
+				if(gunBearing > -8 && gunBearing < 8) {
 					if(aimDirectionRight)
-						setTurnGunRight(6);
+						setTurnGunRight(7);
 					else
-						setTurnGunLeft(6);
+						setTurnGunLeft(7);
 					
 					if(counter % 4 == 0)
 						aimDirectionRight = !aimDirectionRight;
@@ -150,7 +150,7 @@ public class BelugaBot extends AdvancedRobot {
 				}
 				
 				//they got away
-				if(chargingAt.distance > 250) {
+				if(chargingAt.distance > 200) {
 					chargingAt = null;
 				}
 				
@@ -173,13 +173,15 @@ public class BelugaBot extends AdvancedRobot {
 		else
 			enemies.put(e.getName(),new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location));
 		
-		if (e.getDistance() <= 200 && getOthers() < 3)
+		if (e.getDistance() <= 300 && getOthers() < 3)
 			if (chargingAt == null || chargingAt.distance < e.getDistance())
 				chargingAt = enemies.get(e.getName());
-		if(e.getDistance() < 300 || e.getVelocity() <= 1) {
+		if(e.getDistance() < 300 || (e.getDistance() <= 500 && e.getVelocity() <= 1)) {
 			//TODO - change the fire() method to firingAt and handle it in the main while loop.
 			fire(3);
-		} else if (getOthers() >= 10) {
+		}
+		
+		if (getOthers() >= 5) {
 			fire(3);
 		}
 	}
