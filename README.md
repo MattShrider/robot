@@ -1,3 +1,6 @@
-### BELUGA-2.4.5alphav3
+Robots
+============================
+*A repository for Robocode robots.*
 
-#### Super awesome whale bot
+### This contains the following robots:
+ * BELUGA-2.4.5alphav3 : A bot which travels diagonals and rams close enemies.
