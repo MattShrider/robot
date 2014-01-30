@@ -9,6 +9,7 @@ import robocode.util.Utils;
 
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 
 
@@ -22,13 +23,11 @@ public class BelugaBot extends AdvancedRobot {
 	double velocity;
 	
 	Enemy chargingAt = null;
-	Enemy shootingAt = null;
-	boolean aimDirectionRight = false;
 	
 	/** 
 	 * Private class for representing enemies on the field.  Construction based on the onScannedRobot event.
 	 */
-	private class Enemy {
+	private class Enemy implements Comparable {
 		String name;
 		double energy;
 		double bearing;
@@ -55,7 +54,25 @@ public class BelugaBot extends AdvancedRobot {
 			this.velocity = vel;
 			this.location = loc;
 		}
+
+		@Override
+		public int compareTo(Object o) {
+			Enemy other = (Enemy) o;
+			double ourVelocity = Math.abs(this.velocity);
+			double theirVelocity = Math.abs(other.velocity);
+			
+			if(ourVelocity > theirVelocity) {
+				return 1;
+			} else if(ourVelocity < theirVelocity) {
+				return -1;
+			}
+			
+			return 0;
+		}
 		
+		public String toString() {
+			return this.name;
+		}
 	}
 	
 	double arenaRadius;
@@ -64,14 +81,16 @@ public class BelugaBot extends AdvancedRobot {
 	boolean clockwise;
 	int turncounter = 0;
 	HashMap<String, Enemy> enemies = new HashMap<String, Enemy>();
+	ArrayList<Enemy> shootOrder = new ArrayList<Enemy>();
 	
 	public void run() {
-		setBodyColor(Color.blue);
-		setGunColor(Color.blue);
-		setRadarColor(Color.white);
+		setBodyColor(Color.yellow);
+		setGunColor(Color.red);
+		setRadarColor(Color.green);
 		setBulletColor(Color.red);
-		setScanColor(Color.white);
+		setScanColor(Color.green);
 		
+		this.setAdjustRadarForGunTurn(true);
 		//setAdjustGunForRobotTurn(true);
 		//setAdjustRadarForRobotTurn(true);
 		
@@ -117,9 +136,12 @@ public class BelugaBot extends AdvancedRobot {
 		}
 		
 		clockwise = true;
-		double counter = 0;
 		
 		while(true) {
+			Collections.sort(shootOrder);
+			if(shootOrder.size() > 0)
+				fireAt(shootOrder.get(0).location);
+			
 			if (chargingAt == null){
 				if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){
 					if (clockwise)
@@ -128,34 +150,19 @@ public class BelugaBot extends AdvancedRobot {
 						currentTargetIndex--;
 				}
 				
+				setTurnRadarRight(360);
 				Point nextGoto = targetPositions.get(Math.abs(currentTargetIndex) % 4);
 				gogo( (int) nextGoto.getX(), (int) nextGoto.getY());
-				setTurnGunRight(20);
-				execute();
 			} else {
 				gogo(chargingAt.location.x, chargingAt.location.y);
-				
-				double gunBearing = getGunHeading() - chargingAt.heading;
-				
-				setTurnGunRight(20);
-				if(gunBearing > -8 && gunBearing < 8) {
-					if(aimDirectionRight)
-						setTurnGunRight(7);
-					else
-						setTurnGunLeft(7);
-					
-					if(counter % 4 == 0)
-						aimDirectionRight = !aimDirectionRight;
-					counter++;
-				}
 				
 				//they got away
 				if(chargingAt.distance > 200) {
 					chargingAt = null;
 				}
-				
-				execute();
 			}
+			
+			execute();
 		}
 	}
 	
@@ -170,20 +177,16 @@ public class BelugaBot extends AdvancedRobot {
 		
 		if (enemies.containsKey(e.getName()))
 			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
-		else
-			enemies.put(e.getName(),new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location));
-		
+		else {
+			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
+			shootOrder.add(newEnemy);
+			enemies.put(e.getName(), newEnemy);
+		}
+		/*
 		if (e.getDistance() <= 300 && getOthers() < 3)
 			if (chargingAt == null || chargingAt.distance < e.getDistance())
 				chargingAt = enemies.get(e.getName());
-		if(e.getDistance() < 300 || (e.getDistance() <= 500 && e.getVelocity() <= 1)) {
-			//TODO - change the fire() method to firingAt and handle it in the main while loop.
-			fire(3);
-		}
-		
-		if (getOthers() >= 5) {
-			fire(3);
-		}
+				*/
 	}
 	
 	public void onHitByBullet(HitByBulletEvent event) {
@@ -195,6 +198,7 @@ public class BelugaBot extends AdvancedRobot {
 			chargingAt = null;
 		
 		enemies.remove(e.getName());
+		shootOrder.remove(enemies.get(e.getName()));
 	}
 	
 	/* FROM ROBO WIKI */
@@ -244,5 +248,14 @@ public class BelugaBot extends AdvancedRobot {
 	/** Gets the time it will take in game ticks for the bullet to reach the enemy **/
 	public static long getBulletTravelTime(double distanceToEnemy, double bulletPower) {
 	     return (long) Math.ceil(distanceToEnemy / (20 - (3 * bulletPower)));
+	}
+	
+	public void fireAt(Point target) {
+		double angle = Math.atan2(target.getX() - this.getX(), target.getY() - this.getY());
+		double targetAngle = Utils.normalRelativeAngle(angle - getGunHeadingRadians());
+		setTurnGunRightRadians(targetAngle);
+		
+		if(this.getGunHeat() == 0)
+			setFire(3);
 	}
 }
