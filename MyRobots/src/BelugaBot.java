@@ -131,7 +131,6 @@ public class BelugaBot extends AdvancedRobot {
 	boolean clockwise;
 	int turncounter = 0;
 	HashMap<String, Enemy> enemies = new HashMap<String, Enemy>();
-	ArrayList<Enemy> shootOrder = new ArrayList<Enemy>();
 	
 	public void run() {
 		setBodyColor(Color.yellow);
@@ -195,13 +194,12 @@ public class BelugaBot extends AdvancedRobot {
 		colorList.add(new Color(255, 203, 244));
 		colorList.add(new Color(182, 149, 33));
 		while(true) {
-			
 			if (getTime() % 10 == 0){
 				setScanColor(colorList.get(colorIterator++ % colorList.size()));
 				setBodyColor(colorList.get(colorIterator++ % colorList.size()));
 			}
 			
-			
+			ArrayList<Enemy> shootOrder = new ArrayList<Enemy>(enemies.values());
 			Collections.sort(shootOrder);
 			if(shootOrder.size() > 0){
 				Enemy nmy = shootOrder.get(0);
@@ -251,8 +249,7 @@ public class BelugaBot extends AdvancedRobot {
 		if (enemies.containsKey(e.getName()))
 			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeadingRadians(), e.getVelocity(), location);
 		else {
-			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeadingRadians(), e.getVelocity(), location);
-			shootOrder.add(newEnemy);
+			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
 			enemies.put(e.getName(), newEnemy);
 		}
 		/*
@@ -269,8 +266,7 @@ public class BelugaBot extends AdvancedRobot {
 	public void onRobotDeath(RobotDeathEvent e){
 		if (chargingAt == enemies.get(e.getName()))
 			chargingAt = null;
-		
-		shootOrder.remove(enemies.get(e.getName()));
+
 		enemies.remove(e.getName());
 	}
 	
