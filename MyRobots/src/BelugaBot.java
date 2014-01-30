@@ -15,6 +15,12 @@ import java.util.HashMap;
 
 public class BelugaBot extends AdvancedRobot {
 	
+	final private static int LONGDISTANCE = 800;
+	final private static int MEDIUMDISTANCE = 200;
+	final private static int SHORTDISTANCE = 50;
+	
+	final private static double ACCURACYTHRESHOLD = 50;
+	
 	String name;
 	double energy;
 	double bearing;
@@ -35,6 +41,7 @@ public class BelugaBot extends AdvancedRobot {
 		double heading;
 		double velocity;
 		Point location;
+		double accuracy;
 		
 		public Enemy(String name, double energy, double bearing, double distance, double heading, double velocity, Point location ) {
 			this.name = name;
@@ -54,6 +61,15 @@ public class BelugaBot extends AdvancedRobot {
 			this.velocity = vel;
 			this.location = loc;
 		}
+		
+		/** Calculate the accuracy level of taking a shot.  Higher accuracy is better.
+		 * This method will be used as the comparable element in our shoot at list.
+		 * If the risk of all bots is above a threshold, don't take the shot.
+		 */
+		public void calculateAccuracy(){
+			
+			
+		}
 
 		@Override
 		public int compareTo(Object o) {
@@ -61,6 +77,40 @@ public class BelugaBot extends AdvancedRobot {
 			double ourVelocity = Math.abs(this.velocity);
 			double theirVelocity = Math.abs(other.velocity);
 			
+			//THe following statements are multiple sorting methods, starting
+			//  from the top of the list.
+			
+			//if a bot is disabled, just kill it
+			if (this.energy == 0)
+				return -1;
+			
+			//If an enemy is VERY close, shoot at it first
+			if (this.distance < SHORTDISTANCE && other.distance < SHORTDISTANCE){
+				if( this.distance < other.distance)
+					return -1;
+				else
+					return 1;
+			}
+			
+			//Shoot at the closest enemy if more than one enemy is stopped.
+			if (this.velocity == 0 && other.velocity == 0){
+				if (this.distance <= other.distance)
+					return -1;
+				else
+					return 1;
+			}
+			//stopped enemies have the next highest priority
+			if (this.velocity == 0)
+				return -1;
+			if (other.velocity == 0)
+				return 1;
+			//Next, sort by distance to enemies if the distance is below a threshold.
+			if (this.distance < other.distance && this.distance < MEDIUMDISTANCE)
+				return -1;
+			if (this.distance > other.distance && other.distance < MEDIUMDISTANCE)
+				return 1;
+			
+			//finally, sort by velocities.
 			if(ourVelocity > theirVelocity) {
 				return 1;
 			} else if(ourVelocity < theirVelocity) {
@@ -120,7 +170,7 @@ public class BelugaBot extends AdvancedRobot {
 		int currentTargetIndex = 0;
 		
 		targetPositions = new ArrayList<Point>();
-		for(int i = 0; i < 4; i++) {
+		for(int i = 0; i < xTargets.length; i++) {
 			Point tempPoint = new Point();
 			tempPoint.setLocation(xTargets[i], yTargets[i]);
 			targetPositions.add(tempPoint);
@@ -137,10 +187,26 @@ public class BelugaBot extends AdvancedRobot {
 		
 		clockwise = true;
 		
+		int colorIterator = 0;
+		ArrayList<Color> colorList = new ArrayList<Color>();
+		colorList.add(new Color(23, 127, 117));
+		colorList.add(new Color(33, 182, 168));
+		colorList.add(new Color(127, 23, 105));
+		colorList.add(new Color(255, 203, 244));
+		colorList.add(new Color(182, 149, 33));
 		while(true) {
+			
+			if (getTime() % 10 == 0){
+				setScanColor(colorList.get(colorIterator++ % colorList.size()));
+				setBodyColor(colorList.get(colorIterator++ % colorList.size()));
+			}
+			
+			
 			Collections.sort(shootOrder);
-			if(shootOrder.size() > 0)
+			if(shootOrder.size() > 0){
 				fireAt(shootOrder.get(0).location);
+				execute();
+			}
 			
 			if (chargingAt == null){
 				if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){
@@ -170,6 +236,10 @@ public class BelugaBot extends AdvancedRobot {
 	/*** EVENTS ***/
 	/**************/
 	public void onScannedRobot(ScannedRobotEvent e) {
+		if (e.getEnergy() == 0){
+			out.println(e.getName() + "Is disabled!");
+		}
+		
 		Point location = new Point();
 		//location of enemy is our location plus enemy bearing vector
 		location.x = (int) (e.getDistance() * Math.sin(e.getBearingRadians() + getHeadingRadians()) + getX());
@@ -197,8 +267,8 @@ public class BelugaBot extends AdvancedRobot {
 		if (chargingAt == enemies.get(e.getName()))
 			chargingAt = null;
 		
-		enemies.remove(e.getName());
 		shootOrder.remove(enemies.get(e.getName()));
+		enemies.remove(e.getName());
 	}
 	
 	/* FROM ROBO WIKI */
@@ -251,11 +321,12 @@ public class BelugaBot extends AdvancedRobot {
 	}
 	
 	public void fireAt(Point target) {
+		double distance = Math.sqrt(Math.pow(target.getX()-getX(), 2) + Math.pow(target.getY()-getY(), 2));
 		double angle = Math.atan2(target.getX() - this.getX(), target.getY() - this.getY());
 		double targetAngle = Utils.normalRelativeAngle(angle - getGunHeadingRadians());
 		setTurnGunRightRadians(targetAngle);
 		
-		if(this.getGunHeat() == 0)
+		if(this.getGunHeat() == 0 && distance < LONGDISTANCE)
 			setFire(3);
 	}
 }
