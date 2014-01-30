@@ -17,7 +17,7 @@ public class BelugaBot extends AdvancedRobot {
 	
 	final private static int LONGDISTANCE = 800;
 	final private static int MEDIUMDISTANCE = 200;
-	final private static int SHORTDISTANCE = 50;
+	final private static int SHORTDISTANCE = 100;
 	
 	final private static double ACCURACYTHRESHOLD = 50;
 	
@@ -204,7 +204,10 @@ public class BelugaBot extends AdvancedRobot {
 			
 			Collections.sort(shootOrder);
 			if(shootOrder.size() > 0){
-				fireAt(shootOrder.get(0).location);
+				Enemy nmy = shootOrder.get(0);
+				double newx = nmy.location.x + nmy.velocity * Math.sin(nmy.heading) * getBulletTravelTime(nmy.distance + nmy.velocity, 3);
+				double newy = nmy.location.y + nmy.velocity * Math.cos(nmy.heading) * getBulletTravelTime(nmy.distance + nmy.velocity, 3);
+				fireAt(new Point((int) newx, (int) newy));
 				execute();
 			}
 			
@@ -246,9 +249,9 @@ public class BelugaBot extends AdvancedRobot {
 		location.y = (int) (e.getDistance() * Math.cos(e.getBearingRadians() + getHeadingRadians()) + getY());
 		
 		if (enemies.containsKey(e.getName()))
-			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
+			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeadingRadians(), e.getVelocity(), location);
 		else {
-			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
+			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeadingRadians(), e.getVelocity(), location);
 			shootOrder.add(newEnemy);
 			enemies.put(e.getName(), newEnemy);
 		}
