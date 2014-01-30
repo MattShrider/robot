@@ -206,6 +206,12 @@ public class BelugaBot extends AdvancedRobot {
 				Enemy nmy = shootOrder.get(0);
 				double newx = nmy.location.x + nmy.velocity * Math.sin(nmy.heading) * getBulletTravelTime(nmy.distance + nmy.velocity, 3);
 				double newy = nmy.location.y + nmy.velocity * Math.cos(nmy.heading) * getBulletTravelTime(nmy.distance + nmy.velocity, 3);
+				//Error check for out of bounds shots.
+				if (newx > getBattleFieldWidth()) newx = getBattleFieldWidth();
+				if (newx < 0) newx = 0.0;
+				if (newy > getBattleFieldHeight()) newy = getBattleFieldHeight();
+				if (newy < 0) newy = 0.0;
+				
 				fireAt(new Point((int) newx, (int) newy));
 				execute();
 			}
