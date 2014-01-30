@@ -193,6 +193,7 @@ public class BelugaBot extends AdvancedRobot {
 		colorList.add(new Color(127, 23, 105));
 		colorList.add(new Color(255, 203, 244));
 		colorList.add(new Color(182, 149, 33));
+		
 		while(true) {
 			if (getTime() % 10 == 0){
 				setScanColor(colorList.get(colorIterator++ % colorList.size()));
@@ -209,6 +210,8 @@ public class BelugaBot extends AdvancedRobot {
 				execute();
 			}
 			
+			setTurnRadarRight(360);
+			
 			if (chargingAt == null){
 				if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){
 					if (clockwise)
@@ -217,14 +220,13 @@ public class BelugaBot extends AdvancedRobot {
 						currentTargetIndex--;
 				}
 				
-				setTurnRadarRight(360);
 				Point nextGoto = targetPositions.get(Math.abs(currentTargetIndex) % 4);
 				gogo( (int) nextGoto.getX(), (int) nextGoto.getY());
 			} else {
 				gogo(chargingAt.location.x, chargingAt.location.y);
 				
 				//they got away
-				if(chargingAt.distance > 200) {
+				if(chargingAt.distance > 400) {
 					chargingAt = null;
 				}
 			}
@@ -245,18 +247,17 @@ public class BelugaBot extends AdvancedRobot {
 		//location of enemy is our location plus enemy bearing vector
 		location.x = (int) (e.getDistance() * Math.sin(e.getBearingRadians() + getHeadingRadians()) + getX());
 		location.y = (int) (e.getDistance() * Math.cos(e.getBearingRadians() + getHeadingRadians()) + getY());
-		
+
 		if (enemies.containsKey(e.getName()))
 			enemies.get(e.getName()).update(e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeadingRadians(), e.getVelocity(), location);
 		else {
 			Enemy newEnemy = new Enemy(e.getName(), e.getEnergy(), e.getBearing(), e.getDistance(), e.getHeading(), e.getVelocity(), location);
 			enemies.put(e.getName(), newEnemy);
 		}
-		/*
+		
 		if (e.getDistance() <= 300 && getOthers() < 3)
 			if (chargingAt == null || chargingAt.distance < e.getDistance())
 				chargingAt = enemies.get(e.getName());
-				*/
 	}
 	
 	public void onHitByBullet(HitByBulletEvent event) {
