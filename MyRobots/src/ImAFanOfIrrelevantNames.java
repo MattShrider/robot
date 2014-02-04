@@ -280,39 +280,6 @@ public class ImAFanOfIrrelevantNames extends AdvancedRobot {
 	/* FROM ROBO WIKI */
 	
 	//NOTE - These methods do NOT work for rate control robots.
-	
-	/**
-	 * This method is very verbose to explain how things work.
-	 * Do not obfuscate/optimize this sample.
-	 */
-	private void goTo(double x, double y) {
-		/* Transform our coordinates into a vector */
-		x -= getX();
-		y -= getY();
-	 
-		/* Calculate the angle to the target position */
-		double angleToTarget = Math.atan2(x, y);
-	 
-		/* Calculate the turn required get there */
-		double targetAngle = Utils.normalRelativeAngle(angleToTarget - getHeadingRadians());
-	 
-		/* 
-		 * The Java Hypot method is a quick way of getting the length
-		 * of a vector. Which in this case is also the distance between
-		 * our robot and the target location.
-		 */
-		double distance = Math.hypot(x, y);
-	 
-		/* This is a simple method of performing set front as back */
-		double turnAngle = Math.atan(Math.tan(targetAngle));
-		setTurnRightRadians(turnAngle);
-		if(targetAngle == turnAngle) {
-			setAhead(distance);
-		} else {
-			setBack(distance);
-		}
-	}
-	
 	private void gogo(int x, int y) {
 	    double a;
 	    setTurnRightRadians(Math.tan(
@@ -333,7 +300,7 @@ public class ImAFanOfIrrelevantNames extends AdvancedRobot {
 		setTurnGunRightRadians(targetAngle);
 		
 		//if(this.getGunHeat() == 0){
-			if (distance < LONGDISTANCE)
+			//if (distance < LONGDISTANCE)
 				setFire(3);
 		//}
 	}
