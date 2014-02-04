@@ -13,7 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 
 
-public class BelugaBot extends AdvancedRobot {
+public class ImAFanOfIrrelevantNames extends AdvancedRobot {
 	
 	final private static int LONGDISTANCE = 800;
 	final private static int MEDIUMDISTANCE = 200;
@@ -332,7 +332,9 @@ public class BelugaBot extends AdvancedRobot {
 		double targetAngle = Utils.normalRelativeAngle(angle - getGunHeadingRadians());
 		setTurnGunRightRadians(targetAngle);
 		
-		if(distance < LONGDISTANCE)
-			setFire(3);
+		//if(this.getGunHeat() == 0){
+			if (distance < LONGDISTANCE)
+				setFire(3);
+		//}
 	}
 }
