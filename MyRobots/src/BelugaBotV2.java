@@ -3,6 +3,8 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map.Entry;
 
 import robocode.AdvancedRobot;
 import robocode.HitByBulletEvent;
@@ -11,12 +13,14 @@ import robocode.ScannedRobotEvent;
 import robocode.util.Utils;
 
 
-public class BelugaBot extends AdvancedRobot {
+public class BelugaBotV2 extends AdvancedRobot {
+	
+	final private static int CORNERSIZE = 150;
 	
 	final private static int LONGDISTANCE = 800;
 	final private static int MEDIUMDISTANCE = 200;
-	final private static int SHORTDISTANCE = 50;
-
+	final private static int SHORTDISTANCE = 60;
+	
 	String name;
 	double energy;
 	double bearing;
@@ -25,6 +29,10 @@ public class BelugaBot extends AdvancedRobot {
 	double velocity;
 	
 	Enemy chargingAt = null;
+	Point lastGogo, nextGogo;
+	
+	double fieldWidth, fieldHeight;
+	double paddingToWall;
 	
 	/** 
 	 * Private class for representing enemies on the field.  Construction based on the onScannedRobot event.
@@ -37,7 +45,6 @@ public class BelugaBot extends AdvancedRobot {
 		double heading;
 		double velocity;
 		Point location;
-		double accuracy;
 		
 		public Enemy(String name, double energy, double bearing, double distance, double heading, double velocity, Point location ) {
 			this.name = name;
@@ -64,33 +71,26 @@ public class BelugaBot extends AdvancedRobot {
 			double ourSpeed = Math.abs(this.velocity);
 			double theirSpeed = Math.abs(other.velocity);
 			
+			//The following statements are multiple sorting methods, starting
+			//  from the top of the list.
+			
 			//if a bot is disabled, just kill it
 			if (this.energy == 0)
 				return -1;
 			
 			//If an enemy is VERY close, shoot at it first
-			if (this.distance < SHORTDISTANCE && other.distance < SHORTDISTANCE){
-				if( this.distance < other.distance)
+			if (this.distance < SHORTDISTANCE)
 					return -1;
-				else
-					return 1;
-			}
 			
 			//Shoot at the closest enemy if more than one enemy is stopped.
-			if (this.velocity == 0 && other.velocity == 0){
+			if (ourSpeed == 0 && theirSpeed == 0) {
 				if (this.distance <= other.distance)
 					return -1;
 				else
 					return 1;
 			}
-
-			//Next, sort by distance to enemies if the distance is below a threshold.
-			if (ourSpeed < theirSpeed && this.distance < MEDIUMDISTANCE)
-				return -1;
-			if (ourSpeed > other.distance && other.distance < MEDIUMDISTANCE)
-				return 1;
 			
-			//finally, sort by speeds.
+			//finally, sort by speed.
 			if(ourSpeed > theirSpeed) {
 				return 1;
 			} else if(ourSpeed < theirSpeed) {
@@ -122,47 +122,16 @@ public class BelugaBot extends AdvancedRobot {
 		this.setAdjustRadarForGunTurn(true);
 		
 		//gather some data for future use
-		double fieldWidth = getBattleFieldWidth();
-		double fieldHeight = getBattleFieldHeight();
-		double paddingToWall;
-		if(fieldWidth < fieldHeight) {
-			maxMoveAmount = fieldHeight;
-			arenaRadius = fieldWidth;
-			paddingToWall = fieldHeight * 0.04;
-		} else {
-			maxMoveAmount = fieldWidth;
-			arenaRadius = fieldHeight;
-			paddingToWall = fieldWidth * 0.04;
-		}
+		fieldWidth = getBattleFieldWidth();
+		fieldHeight = getBattleFieldHeight();
+		if(fieldWidth < fieldHeight)
+			paddingToWall = fieldHeight * 0.06;
+		else
+			paddingToWall = fieldWidth * 0.06;
 
-		//find closest of 4 target start positions
-		Point selectedTarget = new Point();
-		Point currentPosition = new Point();
-		currentPosition.setLocation(getX(), getY());
-		
-		double minDistance = Integer.MAX_VALUE;
-		double[] xTargets = {fieldWidth/2, fieldWidth - paddingToWall, fieldWidth/2, 0 + paddingToWall};
-		double[] yTargets = {fieldHeight - paddingToWall, fieldHeight/2, 0 + paddingToWall, fieldHeight/2};
-		
-		int currentTargetIndex = 0;
-		
-		targetPositions = new ArrayList<Point>();
-		for(int i = 0; i < xTargets.length; i++) {
-			Point tempPoint = new Point();
-			tempPoint.setLocation(xTargets[i], yTargets[i]);
-			targetPositions.add(tempPoint);
-			
-			double distance;
-			distance = Math.sqrt(Math.pow(xTargets[i] - currentPosition.getX(), 2) + Math.pow(yTargets[i] - currentPosition.getY(), 2));
-			
-			if(distance < minDistance) {
-				minDistance = distance;
-				selectedTarget.setLocation(xTargets[i], yTargets[i]);
-				currentTargetIndex = i;
-			}
-		}
-		
-		clockwise = true;
+		Point leastPopularCorner = getLeastPopularCorner();
+		nextGogo = getRandomPositionInCorner(leastPopularCorner);
+		lastGogo = (Point)nextGogo.clone();
 		
 		int colorIterator = 0;
 		ArrayList<Color> colorList = new ArrayList<Color>();
@@ -190,19 +159,55 @@ public class BelugaBot extends AdvancedRobot {
 				execute();
 			}
 			
+			//find target positions for diamond mode
+			double minDistance = Integer.MAX_VALUE;
+			double[] xTargets = {fieldWidth/2, fieldWidth - paddingToWall, fieldWidth/2, 0 + paddingToWall};
+			double[] yTargets = {fieldHeight - paddingToWall, fieldHeight/2, 0 + paddingToWall, fieldHeight/2};
+			
+			int currentTargetIndex = 0;
+			
+			targetPositions = new ArrayList<Point>();
+			for(int i = 0; i < xTargets.length; i++) {
+				Point tempPoint = new Point();
+				tempPoint.setLocation(xTargets[i], yTargets[i]);
+				targetPositions.add(tempPoint);
+				
+				double distance;
+				distance = Math.sqrt(Math.pow(xTargets[i] - this.getX(), 2) + Math.pow(yTargets[i] - this.getY(), 2));
+				
+				if(distance < minDistance) {
+					minDistance = distance;
+					currentTargetIndex = i;
+				}
+			}
+			
 			//maximize scanning of field
 			setTurnRadarRight(360);
 			
 			if (chargingAt == null){
-				if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){
-					if (clockwise)
-						currentTargetIndex++;
-					else
-						currentTargetIndex--;
+				//at target location, switch target positions
+				if(this.getOthers() < 5) { //DIAMOND MODE
+					if(getDistanceRemaining() <= 1 && getTurnRemaining() <= 1) {
+						if (clockwise)
+							currentTargetIndex++;
+						else
+							currentTargetIndex--;
+					}
+					
+					nextGogo = targetPositions.get(Math.abs(currentTargetIndex) % 4);
+				} else { //LEAST POPULAR CORNER MODE
+					if(getDistanceRemaining() <= 1) {
+						leastPopularCorner = getLeastPopularCorner();
+						
+						do {
+							nextGogo = getRandomPositionInCorner(leastPopularCorner);
+						} while(nextGogo.distance(lastGogo) < CORNERSIZE * .25);
+						
+						lastGogo = (Point)nextGogo.clone();
+					}
 				}
 				
-				Point nextGoto = targetPositions.get(Math.abs(currentTargetIndex) % 4);
-				gogo( (int) nextGoto.getX(), (int) nextGoto.getY());
+				gogo( (int) nextGogo.getX(), (int) nextGogo.getY());
 			} else {
 				gogo(chargingAt.location.x, chargingAt.location.y);
 				
@@ -220,6 +225,10 @@ public class BelugaBot extends AdvancedRobot {
 	/*** EVENTS ***/
 	/**************/
 	public void onScannedRobot(ScannedRobotEvent e) {
+		if (e.getEnergy() == 0){
+			out.println(e.getName() + "Is disabled!");
+		}
+		
 		Point location = new Point();
 		//location of enemy is our location plus enemy bearing vector
 		location.x = (int) (e.getDistance() * Math.sin(e.getBearingRadians() + getHeadingRadians()) + getX());
@@ -234,9 +243,10 @@ public class BelugaBot extends AdvancedRobot {
 		}
 		
 		//engage in charge mode
-		if (e.getDistance() <= 300 && getOthers() < 3)
+		/*if (e.getDistance() <= 200 && this.getOthers() < 4)
 			if (chargingAt == null || chargingAt.distance < e.getDistance())
 				chargingAt = enemies.get(e.getName());
+		*/
 	}
 	
 	public void onHitByBullet(HitByBulletEvent event) {
@@ -273,5 +283,73 @@ public class BelugaBot extends AdvancedRobot {
 		
 		if(this.getGunHeat() == 0 && distance < LONGDISTANCE)
 			setFire(3);
+	}
+	
+	public Point getLeastPopularCorner() {
+		Point corner = new Point();
+		
+		double halfWidth = fieldWidth / 2;
+		double halfHeight = fieldHeight / 2;
+		
+		double[] cornerX = {0, 0, fieldWidth, fieldWidth};
+		double[] cornerY = {0, fieldHeight, fieldHeight, 0};
+		
+		int[] numEnemiesInCorner = new int[4];
+		for(int i = 0; i < numEnemiesInCorner.length; i++)
+			numEnemiesInCorner[i] = 0;
+
+		Iterator it = enemies.entrySet().iterator();
+	    while(it.hasNext()) {
+	        Entry pairs = (Entry)it.next();
+	        Enemy enemy = (Enemy)pairs.getValue();
+			
+			if(enemy.location.x < halfWidth && enemy.location.y < halfHeight)
+				numEnemiesInCorner[0]++;
+			else if(enemy.location.x < halfWidth && enemy.location.y >= halfHeight)
+				numEnemiesInCorner[1]++;
+			else if(enemy.location.x >= halfWidth && enemy.location.y >= halfHeight)
+				numEnemiesInCorner[2]++;
+			else if(enemy.location.x >= halfWidth && enemy.location.y < halfHeight)
+				numEnemiesInCorner[3]++;
+			
+			it.remove(); // avoids a ConcurrentModificationException
+		}
+		
+	    System.out.println("======");
+		int min = numEnemiesInCorner[0];
+		corner.setLocation(cornerX[0], cornerY[0]);
+		System.out.println("0 : " + numEnemiesInCorner[0]);
+		
+		for (int i = 1; i < numEnemiesInCorner.length; i++) {
+			System.out.println(i + " : " + numEnemiesInCorner[i]);
+		    if (numEnemiesInCorner[i] < min) {
+		    	min = numEnemiesInCorner[i];
+		    	corner.setLocation(cornerX[i], cornerY[i]);
+		    }
+		}
+		
+		return corner;
+	}
+	
+	public Point getRandomPositionInCorner(Point corner) {
+		Point position = new Point();
+		double randomX, randomY;
+		
+		double x = corner.getX();
+		double y = corner.getY();
+		
+		if(x == 0)
+			randomX = Math.random() * CORNERSIZE + paddingToWall;
+		else
+			randomX = x - (Math.random() * CORNERSIZE) - paddingToWall;
+		
+		if(y == 0)
+			randomY = Math.random() * CORNERSIZE + paddingToWall;
+		else
+			randomY = y - (Math.random() * CORNERSIZE) - paddingToWall;
+		
+		position.setLocation(randomX, randomY);
+		
+		return position;
 	}
 }
