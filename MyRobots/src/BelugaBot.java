@@ -10,6 +10,10 @@ import robocode.RobotDeathEvent;
 import robocode.ScannedRobotEvent;
 import robocode.util.Utils;
 
+/********************************
+ * CIS 365 - Robocode Melee Bot
+ * By Matt Shrider, Alex Chau
+/********************************/ 
 
 public class BelugaBot extends AdvancedRobot {
 	
